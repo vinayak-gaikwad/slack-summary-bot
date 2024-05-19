@@ -1,7 +1,18 @@
 import os
-import ollama
 from slack_bolt import App
+from slack_bolt.adapter.flask import SlackRequestHandler
+import ollama
+from flask import Flask, request
 from prompt import system_prompt
+
+app = App(
+    signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
+    token=os.environ.get("SLACK_BOT_TOKEN"),
+)
+
+flask_app = Flask(__name__)
+handler = SlackRequestHandler(app)
+
 
 def get_summary(user_prompt, model="phi3"):
 
@@ -17,20 +28,29 @@ def get_summary(user_prompt, model="phi3"):
     )
 
 
-app = App(
-    signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
-    token=os.environ.get("SLACK_BOT_TOKEN"),
-)
+user_id_to_username = {}
 
 
-def get_user_name(user_id, client):
+def get_user_name(user_id):
     try:
-        result = client.users_info(user=user_id)
+        if user_id in user_id_to_username:
+            return user_id_to_username[user_id]
+
+        result = app.client.users_info(user=user_id)
         if result["ok"]:
-            return result["user"]["profile"]["real_name"]
+            username = result["user"]["profile"]["real_name"]
+            user_id_to_username[user_id] = username
+            return username
+
     except Exception as e:
         print(f"Error getting user name: {e}")
-    return None
+
+
+def parse_input(text):
+    parameters = {}
+    if "messages" in text:
+        parameters["messages"] = int(text.split("messages")[1].strip())
+    return parameters
 
 
 @app.event("app_mention")
@@ -41,27 +61,66 @@ def greet_mention(event, say, client):
     try:
         if thread_ts:
             result = client.conversations_replies(channel=channel, ts=thread_ts)
-            chat_history = "Dialogue: \n"
             if result["ok"]:
                 messages = result["messages"]
-                for message in messages:
-                    # user_name = "User"
-                    # if user != message["user"]:
-                    user_name = get_user_name(message["user"], client)
-                    chat_history += f"{user_name}: {message['text']}\n"
-            print(chat_history)
-            summary = get_summary(chat_history)["message"]["content"]
-            client.chat_postEphemeral(
-                channel=channel,
-                user=user,
-                text=f"{user_name}, here is your summary\n{summary}",
-                thread_ts=thread_ts,
-            )
+                summary = summarize_messages(messages)
+
+                client.chat_postEphemeral(
+                    channel=channel,
+                    user=user,
+                    text=summary,
+                    thread_ts=thread_ts,
+                )
         else:
-            say("For now we can only summarize threads :(", channel=channel)
+            say("Error occured, fixing right away!!", channel=channel)
     except Exception as e:
         print(f"Error posting message: {e}")
 
 
+def fetch_messages(channel_id, parameters):
+    response = app.client.conversations_history(
+        channel=channel_id, limit=parameters.get("messages", 100)
+    )
+    return response["messages"]
+
+
+@app.command("/summarize")
+def handle_command(ack, body, respond):
+    ack()
+    channel_id = body["channel_id"]
+    text = body["text"]
+
+    input_parameters = parse_input(text)
+    if not input_parameters:
+        respond(
+            "You must provide at least one of the fields: number of messages, unread messages, or date range."
+        )
+        return
+    messages = fetch_messages(channel_id, input_parameters)
+
+    summary = summarize_messages(messages)
+
+    respond(summary)
+    return
+
+
+def summarize_messages(messages):
+    summary = []
+    for message in messages:
+        user_name = get_user_name(message["user"])
+        summary.append(f"{user_name}: {message['text']}")
+    return "\n".join(summary)
+
+
+@flask_app.route("/slack/events", methods=["POST"])
+def slack_events():
+    return handler.handle(request)
+
+
+@flask_app.route("/summarize", methods=["POST"])
+def summarize():
+    return handler.handle(request)
+
+
 if __name__ == "__main__":
-    app.start(port=int(3000))
+    flask_app.run(port=3000, debug=True)
