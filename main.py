@@ -1,10 +1,11 @@
 import os
+import ollama
+import dateparser
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
-import ollama
 from flask import Flask, request
-from prompt import system_prompt
 from dotenv import load_dotenv
+from prompt import system_prompt
 
 load_dotenv()
 
@@ -53,6 +54,12 @@ def parse_input(text):
     parameters = {}
     if "messages" in text:
         parameters["messages"] = int(text.split("messages")[1].strip())
+    elif "from" in text:
+        ddp = dateparser.date.DateDataParser(languages=["en"])
+        parameters["from"] = ddp.get_date_data(
+            text.split("from")[1].strip()
+        ).date_obj.timestamp()
+
     return parameters
 
 
@@ -82,7 +89,9 @@ def greet_mention(event, say, client):
 
 def fetch_messages(channel_id, parameters):
     response = app.client.conversations_history(
-        channel=channel_id, limit=parameters.get("messages", 100)
+        channel=channel_id,
+        limit=parameters.get("messages", 100),
+        oldest=parameters.get("from", 0),
     )
     return response["messages"]
 
