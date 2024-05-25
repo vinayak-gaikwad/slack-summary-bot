@@ -4,6 +4,9 @@ from slack_bolt.adapter.flask import SlackRequestHandler
 import ollama
 from flask import Flask, request
 from prompt import system_prompt
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = App(
     signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
