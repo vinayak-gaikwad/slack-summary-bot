@@ -1,11 +1,11 @@
 import os
+from datetime import datetime
 import ollama
 import dateparser
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 from flask import Flask, request
 from dotenv import load_dotenv
-from prompt import system_prompt
 
 load_dotenv()
 
@@ -19,17 +19,25 @@ handler = SlackRequestHandler(app)
 
 
 def get_summary(user_prompt, model="phi3"):
-
-    return ollama.chat(
-        model,
-        messages=[
-            {
-                "role": "system",
-                "content": system_prompt,
-            },
-            {"role": "user", "content": user_prompt},
-        ],
-    )
+    prompt = f"""
+Give only one line summary of following conversation, conversation is delimited by triple backticks.
+Only give summary without anything else.
+    
+```{user_prompt}```
+"""
+    try:
+        return ollama.chat(
+            model="llama3",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+        )["message"]["content"]
+    except ollama.ResponseError as e:
+        print("Error:", e.error)
+        return e.error
 
 
 user_id_to_username = {}
@@ -105,7 +113,7 @@ def handle_command(ack, body, respond):
     input_parameters = parse_input(text)
     if not input_parameters:
         respond(
-            "You must provide at least one of the fields: number of messages, unread messages, or date range."
+            "You must provide at least one of the fields: number of messages or duration"
         )
         return
     messages = fetch_messages(channel_id, input_parameters)
@@ -119,9 +127,11 @@ def handle_command(ack, body, respond):
 def summarize_messages(messages):
     summary = []
     for message in messages:
+        ts = datetime.fromtimestamp(float(message["ts"]))
         user_name = get_user_name(message["user"])
-        summary.append(f"{user_name}: {message['text']}")
-    return "\n".join(summary)
+        summary.append(f"[{ts}] {user_name}: {message['text']}")
+
+    return get_summary("\n".join(summary))
 
 
 @flask_app.route("/slack/events", methods=["POST"])
