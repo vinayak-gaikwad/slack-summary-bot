@@ -18,7 +18,7 @@ flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
 
-def get_summary(user_prompt, model="phi3"):
+def get_summary(user_prompt, model="llama3"):
     prompt = f"""
 Give only one line summary of following conversation, conversation is delimited by triple backticks.
 Only give summary without anything else.
@@ -27,7 +27,7 @@ Only give summary without anything else.
 """
     try:
         return ollama.chat(
-            model="llama3",
+            model=model,
             messages=[
                 {
                     "role": "user",
@@ -106,7 +106,7 @@ def fetch_messages(channel_id, parameters):
 
 @app.command("/summarize")
 def handle_command(ack, body, respond):
-    ack()
+    ack(response_type="ephemeral", text="Summarizing your messages... :hourglass:")
     channel_id = body["channel_id"]
     text = body["text"]
 
