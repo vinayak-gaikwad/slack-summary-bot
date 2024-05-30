@@ -57,10 +57,17 @@ def get_user_name(user_id):
     except Exception as e:
         print(f"Error getting user name: {e}")
 
-
+help_message = """
+`/summary messages 10` => summarizes last 10 messages
+`/summary from 1 day ago` => summarizes messages sent 1 day ago
+`/summary from 1 hour ago` => summarizes messages sent 1 hour ago
+`/summary help` => help menu 
+"""
 def parse_input(text):
     parameters = {}
-    if "messages" in text:
+    if "help" in text:
+        parameters["help"] = help_message
+    elif "messages" in text:
         parameters["messages"] = int(text.split("messages")[1].strip())
     elif "from" in text:
         ddp = dateparser.date.DateDataParser(languages=["en"])
@@ -116,6 +123,8 @@ def handle_command(ack, body, respond):
             "You must provide at least one of the fields: number of messages or duration"
         )
         return
+    if "help" in input_parameters:
+        respond(input_parameters["help"])
     messages = fetch_messages(channel_id, input_parameters)
 
     summary = summarize_messages(messages)
