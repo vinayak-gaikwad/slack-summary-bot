@@ -13,16 +13,16 @@ app = App(
     signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
     token=os.environ.get("SLACK_BOT_TOKEN"),
 )
-
+model = os.environ.get("MODEL", "llama3")
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
 
 
-def get_summary(user_prompt, model="llama3"):
+def get_summary(user_prompt, model=model):
     prompt = f"""
-Give only one line summary of following conversation, conversation is delimited by triple backticks.
+Give one line summary of following conversation, conversation is delimited by triple backticks.
 Only give summary without anything else.
-    
+
 ```{user_prompt}```
 """
     try:
@@ -57,17 +57,17 @@ def get_user_name(user_id):
     except Exception as e:
         print(f"Error getting user name: {e}")
 
+
 help_message = """
 `/summary messages 10` => summarizes last 10 messages
 `/summary from 1 day ago` => summarizes messages sent 1 day ago
 `/summary from 1 hour ago` => summarizes messages sent 1 hour ago
-`/summary help` => help menu 
 """
+
+
 def parse_input(text):
     parameters = {}
-    if "help" in text:
-        parameters["help"] = help_message
-    elif "messages" in text:
+    if "messages" in text:
         parameters["messages"] = int(text.split("messages")[1].strip())
     elif "from" in text:
         ddp = dateparser.date.DateDataParser(languages=["en"])
@@ -112,7 +112,7 @@ def fetch_messages(channel_id, parameters):
 
 
 @app.command("/summarize")
-def handle_command(ack, body, respond):
+def handle_summarize_command(ack, body, respond):
     ack(response_type="ephemeral", text="Summarizing your messages... :hourglass:")
     channel_id = body["channel_id"]
     text = body["text"]
@@ -123,13 +123,19 @@ def handle_command(ack, body, respond):
             "You must provide at least one of the fields: number of messages or duration"
         )
         return
-    if "help" in input_parameters:
-        respond(input_parameters["help"])
+
     messages = fetch_messages(channel_id, input_parameters)
 
     summary = summarize_messages(messages)
 
     respond(summary)
+    return
+
+
+@app.command("/summary-help")
+def handle_summary_help_command(ack, _, respond):
+    ack()
+    respond(help_message)
     return
 
 
@@ -150,6 +156,11 @@ def slack_events():
 
 @flask_app.route("/summarize", methods=["POST"])
 def summarize():
+    return handler.handle(request)
+
+
+@flask_app.route("/summary-help", methods=["POST"])
+def get_summary_help():
     return handler.handle(request)
 
 
