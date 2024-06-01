@@ -93,7 +93,7 @@ def greet_mention(event, say, client):
             client.chat_postEphemeral(
                 channel=channel,
                 user=user,
-                text="App mentions only works in threads",
+                text="Please mention me in a thread to get a summary of the conversation.",
             )
     except Exception as e:
         print(f"Error posting message: {e}")
@@ -116,6 +116,7 @@ def handle_summarize_command(ack, body, respond):
     ack(response_type="ephemeral", text="Summarizing your messages... :hourglass:")
     channel_id = body["channel_id"]
     text = body["text"]
+    user_id = body["user_id"]
 
     input_parameters = parse_input(text)
     if not input_parameters:
@@ -125,10 +126,20 @@ def handle_summarize_command(ack, body, respond):
         return
 
     messages = fetch_messages(channel_id, input_parameters)
+    messages_size = len(messages)
+
+    if messages_size == 0:
+        respond("No messages to summarize.")
+        return
+
+    first_message_link = app.client.chat_getPermalink(
+        channel=channel_id, message_ts=messages[messages_size - 1]["ts"]
+    )["permalink"]
 
     summary = summarize_messages(messages)
+    response_text = f":wave: Hi <@{get_user_name(user_id)}>! Here is the summary of your requested messages:\n\n{summary}\n\n<{first_message_link}|Go to the conversation>"
 
-    respond(summary)
+    respond(response_text)
     return
 
 
