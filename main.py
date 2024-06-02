@@ -6,6 +6,7 @@ from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
 from flask import Flask, request
 from dotenv import load_dotenv
+from ollama import Client
 
 load_dotenv()
 
@@ -16,8 +17,9 @@ app = App(
 model = os.environ.get("MODEL", "llama3")
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
+ollama_host = os.environ.get("OLLAMA_HOST", 'http://localhost:11434')
 
-
+ollama_client = Client(host=ollama_host)
 def get_summary(user_prompt, model=model):
     prompt = f"""
 Give one line summary of following conversation, conversation is delimited by triple backticks.
@@ -26,7 +28,7 @@ Only give summary without anything else.
 ```{user_prompt}```
 """
     try:
-        return ollama.chat(
+        return ollama_client.chat(
             model=model,
             messages=[
                 {
