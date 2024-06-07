@@ -17,13 +17,18 @@ app = App(
 model = os.environ.get("MODEL", "llama3")
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
-ollama_host = os.environ.get("OLLAMA_HOST", 'http://localhost:11434')
+ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 ollama_client = Client(host=ollama_host)
+
+
 def get_summary(user_prompt, model=model):
     prompt = f"""
-Give one line summary of following conversation, conversation is delimited by triple backticks.
-Only give summary without anything else.
+You are a Slack summary bot. Give brief summary of following conversation conversation is delimited by triple backticks.
+- include key points and highlights.
+- give summary in plain text.
+- do not format summary.
+- do not give text, code, or anything before and after summary.
 
 ```{user_prompt}```
 """
