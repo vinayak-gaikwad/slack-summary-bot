@@ -79,23 +79,22 @@ def parse_input(text):
 
 
 @app.event("app_mention")
-def greet_mention(event, say, client):
+def summarize_thread(event, _, client):
     user = event["user"]
     channel = event["channel"]
     thread_ts = event.get("thread_ts")
     try:
         if thread_ts:
             result = client.conversations_replies(channel=channel, ts=thread_ts)
-            if result["ok"]:
-                messages = result["messages"]
-                summary = summarize_messages(messages)
+            messages = result["messages"]
+            summary = summarize_messages(messages)
 
-                client.chat_postEphemeral(
-                    channel=channel,
-                    user=user,
-                    text=summary,
-                    thread_ts=thread_ts,
-                )
+            client.chat_postEphemeral(
+                channel=channel,
+                user=user,
+                text=summary,
+                thread_ts=thread_ts,
+            )
         else:
             client.chat_postEphemeral(
                 channel=channel,
