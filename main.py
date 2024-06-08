@@ -11,15 +11,20 @@ from message import *
 
 load_dotenv()
 
+model = os.environ.get("MODEL", "llama3")
+ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+flask_host = os.environ.get("FLASK_HOST", "0.0.0.0")
+flask_port = os.environ.get("FLASK_PORT", 3000)
+flask_debug = os.environ.get("FLASK_DEBUG", False)
+
+
 app = App(
     signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
     token=os.environ.get("SLACK_BOT_TOKEN"),
 )
-model = os.environ.get("MODEL", "llama3")
+
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(app)
-ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-
 ollama_client = Client(host=ollama_host)
 
 
@@ -187,4 +192,4 @@ def get_summary_help():
 
 
 if __name__ == "__main__":
-    flask_app.run(host="0.0.0.0", port=3000, debug=True)
+    flask_app.run(host=flask_host, port=flask_port, debug=flask_debug)
