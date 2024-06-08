@@ -21,3 +21,14 @@ Use the following commands to get summaries of your Slack conversations:
 
 Happy summarizing!!
 """
+
+MISSING_PARAMETER_MESSAGE = """
+You must provide at least one of the fields: `messages` or `from`\n
+For more details use `/summary-help`
+"""
+
+EMPTY_CONVERSATION_MESSAGE = "No messages to summarize."
+
+CHANNEL_MENTION_ERROR = (
+    "Please mention me in a thread to get a summary of the conversation."
+)

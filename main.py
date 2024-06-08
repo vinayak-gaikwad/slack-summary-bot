@@ -7,7 +7,7 @@ from slack_bolt.adapter.flask import SlackRequestHandler
 from flask import Flask, request
 from dotenv import load_dotenv
 from ollama import Client
-from message import HELP_MESSAGE
+from message import *
 
 load_dotenv()
 
@@ -84,7 +84,7 @@ def fetch_messages(channel_id, parameters):
     try:
         response = app.client.conversations_history(
             channel=channel_id,
-            limit=parameters.get("messages", 100),
+            limit=parameters.get("messages", 0),
             oldest=parameters.get("from", 0),
         )
         if not response["ok"]:
@@ -114,7 +114,7 @@ def summarize_thread(event, _, client):
         client.chat_postEphemeral(
             channel=channel,
             user=user,
-            text="Please mention me in a thread to get a summary of the conversation.",
+            text=CHANNEL_MENTION_ERROR,
         )
     try:
         result = client.conversations_replies(channel=channel, ts=thread_ts)
@@ -136,30 +136,29 @@ def summarize_thread(event, _, client):
 @app.command("/summarize")
 def handle_summarize_command(ack, body, respond):
     ack(response_type="ephemeral", text="Summarizing your messages... :hourglass:")
+
     channel_id = body["channel_id"]
     text = body["text"]
     user_id = body["user_id"]
 
     input_parameters = parse_input(text)
     if not input_parameters:
-        respond(
-            "You must provide at least one of the fields: number of messages or duration"
-        )
+        respond(MISSING_PARAMETER_MESSAGE)
         return
 
     messages = fetch_messages(channel_id, input_parameters)
-    messages_size = len(messages)
-
-    if messages_size == 0:
-        respond("No messages to summarize.")
+    if not messages:
+        respond(EMPTY_CONVERSATION_MESSAGE)
         return
 
     first_message_link = app.client.chat_getPermalink(
-        channel=channel_id, message_ts=messages[messages_size - 1]["ts"]
+        channel=channel_id, message_ts=messages[-1]["ts"]
     )["permalink"]
 
     summary = get_summary(format_messages(messages))
-    response_text = f":wave: Hi <@{get_user_name(user_id)}>! Here is the summary of your requested messages:\n\n{summary}\n\n<{first_message_link}|Go to the conversation>"
+    response_text = f""":wave: Hi <@{user_id}>!
+    Here is the summary of your requested messages:\n\n{summary}\n\n
+    <{first_message_link}|Go to the conversation>"""
 
     respond(response_text)
     return
