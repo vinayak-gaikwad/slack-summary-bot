@@ -52,15 +52,16 @@ user_id_to_username = {}
 
 
 def get_user_name(user_id):
+    if user_id in user_id_to_username:
+        return user_id_to_username[user_id]
     try:
-        if user_id in user_id_to_username:
-            return user_id_to_username[user_id]
-
         result = app.client.users_info(user=user_id)
-        if result["ok"]:
-            username = result["user"]["profile"]["real_name"]
-            user_id_to_username[user_id] = username
-            return username
+        if not result["ok"]:
+            raise Exception(result["error"])
+
+        username = result["user"]["profile"]["real_name"]
+        user_id_to_username[user_id] = username
+        return username
 
     except Exception as e:
         print(f"Error getting user name: {e}")
