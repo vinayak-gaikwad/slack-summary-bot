@@ -112,6 +112,8 @@ def fetch_messages(channel_id, parameters):
             limit=parameters.get("messages", 100),
             oldest=parameters.get("from", 0),
         )
+        if not response["ok"]:
+            raise Exception(response["error"])
         return response["messages"]
     except Exception as e:
         print(f"Error fetching messages: {e}")
