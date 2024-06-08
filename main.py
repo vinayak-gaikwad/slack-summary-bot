@@ -94,14 +94,14 @@ def fetch_messages(channel_id, parameters):
         print(f"Error fetching messages: {e}")
 
 
-def summarize_messages(messages):
-    summary = []
-    for message in messages:
-        ts = datetime.fromtimestamp(float(message["ts"]))
+def format_messages(messages):
+    def get_formatted_message(message):
+        timestamp = datetime.fromtimestamp(float(message["ts"]))
         user_name = get_user_name(message["user"])
-        summary.append(f"[{ts}] {user_name}: {message['text']}")
+        return f"[{timestamp}] {user_name}: {message['text']}"
 
-    return get_summary("\n".join(summary))
+    formatted_messages = [get_formatted_message(message) for message in messages]
+    return "\n".join(formatted_messages)
 
 
 @app.event("app_mention")
@@ -109,26 +109,28 @@ def summarize_thread(event, _, client):
     user = event["user"]
     channel = event["channel"]
     thread_ts = event.get("thread_ts")
-    try:
-        if thread_ts:
-            result = client.conversations_replies(channel=channel, ts=thread_ts)
-            messages = result["messages"]
-            summary = summarize_messages(messages)
 
-            client.chat_postEphemeral(
-                channel=channel,
-                user=user,
-                text=summary,
-                thread_ts=thread_ts,
-            )
-        else:
-            client.chat_postEphemeral(
-                channel=channel,
-                user=user,
-                text="Please mention me in a thread to get a summary of the conversation.",
-            )
+    if not thread_ts:
+        client.chat_postEphemeral(
+            channel=channel,
+            user=user,
+            text="Please mention me in a thread to get a summary of the conversation.",
+        )
+    try:
+        result = client.conversations_replies(channel=channel, ts=thread_ts)
+        if not result["ok"]:
+            raise Exception(request["error"])
+
+        summary = get_summary(format_messages(result["messages"]))
+        client.chat_postEphemeral(
+            channel=channel,
+            user=user,
+            text=summary,
+            thread_ts=thread_ts,
+        )
+
     except Exception as e:
-        print(f"Error posting message: {e}")
+        print(f"Error occured: {e}")
 
 
 @app.command("/summarize")
@@ -156,7 +158,7 @@ def handle_summarize_command(ack, body, respond):
         channel=channel_id, message_ts=messages[messages_size - 1]["ts"]
     )["permalink"]
 
-    summary = summarize_messages(messages)
+    summary = get_summary(format_messages(messages))
     response_text = f":wave: Hi <@{get_user_name(user_id)}>! Here is the summary of your requested messages:\n\n{summary}\n\n<{first_message_link}|Go to the conversation>"
 
     respond(response_text)
