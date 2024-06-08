@@ -80,6 +80,30 @@ def parse_input(text):
     return parameters
 
 
+def fetch_messages(channel_id, parameters):
+    try:
+        response = app.client.conversations_history(
+            channel=channel_id,
+            limit=parameters.get("messages", 100),
+            oldest=parameters.get("from", 0),
+        )
+        if not response["ok"]:
+            raise Exception(response["error"])
+        return response["messages"]
+    except Exception as e:
+        print(f"Error fetching messages: {e}")
+
+
+def summarize_messages(messages):
+    summary = []
+    for message in messages:
+        ts = datetime.fromtimestamp(float(message["ts"]))
+        user_name = get_user_name(message["user"])
+        summary.append(f"[{ts}] {user_name}: {message['text']}")
+
+    return get_summary("\n".join(summary))
+
+
 @app.event("app_mention")
 def summarize_thread(event, _, client):
     user = event["user"]
@@ -105,20 +129,6 @@ def summarize_thread(event, _, client):
             )
     except Exception as e:
         print(f"Error posting message: {e}")
-
-
-def fetch_messages(channel_id, parameters):
-    try:
-        response = app.client.conversations_history(
-            channel=channel_id,
-            limit=parameters.get("messages", 100),
-            oldest=parameters.get("from", 0),
-        )
-        if not response["ok"]:
-            raise Exception(response["error"])
-        return response["messages"]
-    except Exception as e:
-        print(f"Error fetching messages: {e}")
 
 
 @app.command("/summarize")
@@ -158,16 +168,6 @@ def handle_summary_help_command(ack, _, respond):
     ack()
     respond(HELP_MESSAGE)
     return
-
-
-def summarize_messages(messages):
-    summary = []
-    for message in messages:
-        ts = datetime.fromtimestamp(float(message["ts"]))
-        user_name = get_user_name(message["user"])
-        summary.append(f"[{ts}] {user_name}: {message['text']}")
-
-    return get_summary("\n".join(summary))
 
 
 @flask_app.route("/slack/events", methods=["POST"])
